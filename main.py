@@ -8,10 +8,11 @@ import time
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Память по пользователям
+# Память: история сообщений, время последнего сообщения, активные таймеры, был ли привет
 conversation_history = {}
 last_message_time = {}
 reply_timers = {}
+greeted_users = set()
 
 @app.route("/", methods=["GET"])
 def index():
@@ -25,41 +26,29 @@ def whatsapp_reply():
     if not incoming_msg:
         return str(MessagingResponse().message("Здравствуйте! Напишите что-нибудь 🎵"))
 
-    # Сохраняем время последнего сообщения
     last_message_time[user_number] = time.time()
 
-    # Сохраняем сообщение в историю
-    if user_number not in conversation_history:
-        conversation_history[user_number] = []
-
-    conversation_history[user_number].append({"role": "user", "content": incoming_msg})
-    conversation_history[user_number] = conversation_history[user_number][-50:]  # до 50 реплик
-
-    # Приветствие только один раз
-    if len([m for m in conversation_history[user_number] if m["role"] == "assistant"]) == 0:
+    # Приветствие — только если ранее не было
+    if user_number not in greeted_users:
+        greeted_users.add(user_number)
         reply = MessagingResponse()
         reply.message("Добрый день! ☺️ Чем можем помочь? Хотите кого-то поздравить? 😁")
         return str(reply)
 
-    # Если уже есть активный таймер — не запускаем второй
-    if user_number in reply_timers and reply_timers[user_number].is_alive():
-        return ('', 204)
-
-    # Запуск отложенного ответа через 10 секунд
-    timer = threading.Timer(10.0, lambda: delayed_reply(user_number))
-    reply_timers[user_number] = timer
-    timer.start()
+    # Запустить таймер, если ещё не запущен
+    if user_number not in reply_timers or not reply_timers[user_number].is_alive():
+        timer = threading.Timer(10.0, lambda: delayed_reply(user_number, incoming_msg))
+        reply_timers[user_number] = timer
+        timer.start()
 
     return ('', 204)
 
-def delayed_reply(user_number):
-    # Если клиент всё ещё печатает — не отвечаем
+def delayed_reply(user_number, last_message):
+    # Проверка: прошло ли 10 секунд с последнего сообщения
     if time.time() - last_message_time[user_number] < 10:
         return
 
-    history = conversation_history.get(user_number, [])
-
-    # Определяем цену по номеру
+    # Определение цены
     if user_number.startswith("whatsapp:+7"):
         price_info = "Стоимость создания песни — 6490 тенге 🇰🇿"
     elif user_number.startswith("whatsapp:+992"):
@@ -101,18 +90,20 @@ def delayed_reply(user_number):
 """
     }
 
-    messages = [system_prompt] + history
+    # История для пользователя
+    history = conversation_history.get(user_number, [])
+    full_history = [system_prompt] + history + [{"role": "user", "content": last_message}]
 
     try:
         gpt_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=messages,
+            messages=full_history,
             max_tokens=1000,
             temperature=0.9
         )
         reply_text = gpt_response.choices[0].message.content.strip()
 
-        # Отправка через Twilio API
+        # Отправка через Twilio
         from twilio.rest import Client as TwilioClient
         twilio_sid = os.environ.get("TWILIO_ACCOUNT_SID")
         twilio_token = os.environ.get("TWILIO_AUTH_TOKEN")
@@ -125,9 +116,12 @@ def delayed_reply(user_number):
             body=reply_text
         )
 
-        # Сохраняем ответ в историю
-        conversation_history[user_number].append({"role": "assistant", "content": reply_text})
-        conversation_history[user_number] = conversation_history[user_number][-50:]
+        # Обновляем историю (до 50 реплик)
+        updated_history = history + [
+            {"role": "user", "content": last_message},
+            {"role": "assistant", "content": reply_text}
+        ]
+        conversation_history[user_number] = updated_history[-50:]
 
     except Exception as e:
-        print("Ошибка при отправке:", e)
+        print("❌ Ошибка при отправке:", e)
