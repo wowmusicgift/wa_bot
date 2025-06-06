@@ -5,10 +5,11 @@ import os
 import threading
 import time
 
+from twilio.rest import Client as TwilioClient
+
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Храним: историю, время, таймеры, флаг приветствия
 conversation_history = {}
 last_message_time = {}
 reply_timers = {}
@@ -23,6 +24,10 @@ def whatsapp_reply():
     user_number = request.values.get('From', '')
     incoming_msg = request.values.get('Body', '').strip()
 
+    if not incoming_msg:
+        return str(MessagingResponse().message("Пожалуйста, напишите что-нибудь 😊"))
+
+    # Очистка памяти
     if incoming_msg.lower() == "memory_clean":
         conversation_history[user_number] = []
         user_greeted[user_number] = False
@@ -35,15 +40,18 @@ def whatsapp_reply():
     if user_number not in conversation_history:
         conversation_history[user_number] = []
 
-    if user_greeted.get(user_number) != True:
+    # Приветствие, если не отправлено
+    if not user_greeted.get(user_number, False):
         user_greeted[user_number] = True
         reply = MessagingResponse()
         reply.message("Добрый день! ☺️ Чем можем помочь? Хотите кого-то поздравить? 😁")
         return str(reply)
 
+    # Сохраняем входящее сообщение
     conversation_history[user_number].append({"role": "user", "content": incoming_msg})
     conversation_history[user_number] = conversation_history[user_number][-50:]
 
+    # Запускаем таймер, если он не активен
     if user_number not in reply_timers or not reply_timers[user_number].is_alive():
         timer = threading.Timer(10.0, lambda: delayed_reply(user_number))
         reply_timers[user_number] = timer
@@ -57,6 +65,7 @@ def delayed_reply(user_number):
 
     history = conversation_history.get(user_number, [])
 
+    # Определение цены
     if user_number.startswith("whatsapp:+7"):
         price_info = "Стоимость создания песни — 6490 тенге 🇰🇿"
     elif user_number.startswith("whatsapp:+992"):
@@ -97,30 +106,32 @@ def delayed_reply(user_number):
 """
     }
 
-    full_history = [system_prompt] + history
+    messages = [system_prompt] + history
 
     try:
         gpt_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=full_history,
+            messages=messages,
             max_tokens=1000,
             temperature=0.9
         )
+
         reply_text = gpt_response.choices[0].message.content.strip()
 
-        from twilio.rest import Client as TwilioClient
         twilio = TwilioClient(
             os.environ.get("TWILIO_ACCOUNT_SID"),
             os.environ.get("TWILIO_AUTH_TOKEN")
         )
+
         twilio.messages.create(
             from_=os.environ.get("TWILIO_WHATSAPP_NUMBER"),
             to=user_number,
             body=reply_text
         )
 
+        # Сохраняем ответ
         conversation_history[user_number].append({"role": "assistant", "content": reply_text})
         conversation_history[user_number] = conversation_history[user_number][-50:]
 
     except Exception as e:
-        print("❌ Ошибка при отправке:", e)
+        print("❌ Ошибка при ответе:", e)
