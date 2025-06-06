@@ -8,11 +8,10 @@ import time
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Память: история сообщений, время последнего сообщения, активные таймеры, был ли привет
+# Храним диалоги, таймеры и время
 conversation_history = {}
 last_message_time = {}
 reply_timers = {}
-greeted_users = set()
 
 @app.route("/", methods=["GET"])
 def index():
@@ -23,32 +22,45 @@ def whatsapp_reply():
     user_number = request.values.get('From', '')
     incoming_msg = request.values.get('Body', '').strip()
 
-    if not incoming_msg:
-        return str(MessagingResponse().message("Здравствуйте! Напишите что-нибудь 🎵"))
+    # Команда для очистки памяти
+    if incoming_msg.lower() == "memory_clean":
+        conversation_history[user_number] = []
+        reply = MessagingResponse()
+        reply.message("История диалога очищена. Можем начать заново 😊")
+        return str(reply)
 
+    # Сохраняем время последнего сообщения
     last_message_time[user_number] = time.time()
 
-    # Приветствие — только если ранее не было
-    if user_number not in greeted_users:
-        greeted_users.add(user_number)
+    # Если нет истории — создаём
+    if user_number not in conversation_history:
+        conversation_history[user_number] = []
+
+    # Если истории нет — приветствие
+    if not any(m["role"] == "assistant" for m in conversation_history[user_number]):
         reply = MessagingResponse()
         reply.message("Добрый день! ☺️ Чем можем помочь? Хотите кого-то поздравить? 😁")
         return str(reply)
 
-    # Запустить таймер, если ещё не запущен
+    # Добавляем новое сообщение в историю (после приветствия)
+    conversation_history[user_number].append({"role": "user", "content": incoming_msg})
+    conversation_history[user_number] = conversation_history[user_number][-50:]
+
+    # Если нет активного таймера — запускаем
     if user_number not in reply_timers or not reply_timers[user_number].is_alive():
-        timer = threading.Timer(10.0, lambda: delayed_reply(user_number, incoming_msg))
+        timer = threading.Timer(10.0, lambda: delayed_reply(user_number))
         reply_timers[user_number] = timer
         timer.start()
 
     return ('', 204)
 
-def delayed_reply(user_number, last_message):
-    # Проверка: прошло ли 10 секунд с последнего сообщения
+def delayed_reply(user_number):
     if time.time() - last_message_time[user_number] < 10:
-        return
+        return  # пользователь ещё пишет
 
-    # Определение цены
+    history = conversation_history.get(user_number, [])
+
+    # Определим цену по номеру
     if user_number.startswith("whatsapp:+7"):
         price_info = "Стоимость создания песни — 6490 тенге 🇰🇿"
     elif user_number.startswith("whatsapp:+992"):
@@ -90,9 +102,7 @@ def delayed_reply(user_number, last_message):
 """
     }
 
-    # История для пользователя
-    history = conversation_history.get(user_number, [])
-    full_history = [system_prompt] + history + [{"role": "user", "content": last_message}]
+    full_history = [system_prompt] + history
 
     try:
         gpt_response = client.chat.completions.create(
@@ -116,12 +126,9 @@ def delayed_reply(user_number, last_message):
             body=reply_text
         )
 
-        # Обновляем историю (до 50 реплик)
-        updated_history = history + [
-            {"role": "user", "content": last_message},
-            {"role": "assistant", "content": reply_text}
-        ]
-        conversation_history[user_number] = updated_history[-50:]
+        # Обновляем историю
+        conversation_history[user_number].append({"role": "assistant", "content": reply_text})
+        conversation_history[user_number] = conversation_history[user_number][-50:]
 
     except Exception as e:
         print("❌ Ошибка при отправке:", e)
