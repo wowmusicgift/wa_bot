@@ -2,8 +2,6 @@ from flask import Flask, request
 import requests
 from openai import OpenAI
 import os
-import threading
-import time
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -12,8 +10,6 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
 conversation_history = {}
-last_message_time = {}
-reply_timers = {}
 
 @app.route("/")
 def home():
@@ -35,32 +31,31 @@ def telegram_webhook():
 
     user_id = str(chat_id)
 
+    # Команда очистки памяти
     if text.lower() == "memory_clean":
         conversation_history[user_id] = []
         send_message(chat_id, "История очищена. Можем начать заново 😊")
         return "ok"
 
+    # Инициализируем историю при первом сообщении
     if user_id not in conversation_history:
         conversation_history[user_id] = []
         send_message(chat_id, "Добрый день! ☺️ Чем можем помочь? Хотите кого-то поздравить? 😁")
 
-    last_message_time[user_id] = time.time()
+    # Добавляем новое сообщение
     conversation_history[user_id].append({"role": "user", "content": text})
     conversation_history[user_id] = conversation_history[user_id][-50:]
 
-    if user_id not in reply_timers or not reply_timers[user_id].is_alive():
-        timer = threading.Timer(10.0, lambda: delayed_reply(user_id, chat_id))
-        reply_timers[user_id] = timer
-        timer.start()
+    # Получаем ответ от GPT
+    reply = generate_gpt_reply(conversation_history[user_id])
+    if reply:
+        conversation_history[user_id].append({"role": "assistant", "content": reply})
+        conversation_history[user_id] = conversation_history[user_id][-50:]
+        send_message(chat_id, reply)
 
     return "ok"
 
-def delayed_reply(user_id, chat_id):
-    if time.time() - last_message_time[user_id] < 10:
-        return
-
-    history = conversation_history.get(user_id, [])
-
+def generate_gpt_reply(user_history):
     system_prompt = {
         "role": "system",
         "content": """
@@ -89,29 +84,21 @@ def delayed_reply(user_id, chat_id):
 """
     }
 
-    full_history = [system_prompt] + history
+    full_history = [system_prompt] + user_history
 
     try:
-        print("🔎 GPT-запрос:", [m['content'] for m in full_history])
-
         gpt_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=full_history,
             max_tokens=1000,
             temperature=0.9
         )
-
         reply_text = gpt_response.choices[0].message.content.strip()
         print("✅ GPT-ответ:", reply_text)
-
-        send_message(chat_id, reply_text)
-        print("📤 Отправлено пользователю.")
-
-        conversation_history[user_id].append({"role": "assistant", "content": reply_text})
-        conversation_history[user_id] = conversation_history[user_id][-50:]
-
+        return reply_text
     except Exception as e:
-        print("❌ Ошибка при ответе:", e)
+        print("❌ Ошибка GPT:", e)
+        return "Извините, произошла ошибка. Попробуйте ещё раз позже."
 
 def send_message(chat_id, text):
     try:
