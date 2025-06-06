@@ -8,11 +8,9 @@ import time
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Telegram config
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
-# Хранилища
 conversation_history = {}
 last_message_time = {}
 reply_timers = {}
@@ -46,12 +44,10 @@ def telegram_webhook():
         conversation_history[user_id] = []
         send_message(chat_id, "Добрый день! ☺️ Чем можем помочь? Хотите кого-то поздравить? 😁")
 
-    # Сохраняем время и сообщение
     last_message_time[user_id] = time.time()
     conversation_history[user_id].append({"role": "user", "content": text})
     conversation_history[user_id] = conversation_history[user_id][-50:]
 
-    # Запускаем таймер
     if user_id not in reply_timers or not reply_timers[user_id].is_alive():
         timer = threading.Timer(10.0, lambda: delayed_reply(user_id, chat_id))
         reply_timers[user_id] = timer
@@ -61,7 +57,7 @@ def telegram_webhook():
 
 def delayed_reply(user_id, chat_id):
     if time.time() - last_message_time[user_id] < 10:
-        return  # человек ещё пишет
+        return
 
     history = conversation_history.get(user_id, [])
 
@@ -96,27 +92,33 @@ def delayed_reply(user_id, chat_id):
     full_history = [system_prompt] + history
 
     try:
+        print("🔎 GPT-запрос:", [m['content'] for m in full_history])
+
         gpt_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=full_history,
             max_tokens=1000,
             temperature=0.9
         )
-        reply_text = gpt_response.choices[0].message.content.strip()
-        send_message(chat_id, reply_text)
 
-        # Добавим ответ в историю
+        reply_text = gpt_response.choices[0].message.content.strip()
+        print("✅ GPT-ответ:", reply_text)
+
+        send_message(chat_id, reply_text)
+        print("📤 Отправлено пользователю.")
+
         conversation_history[user_id].append({"role": "assistant", "content": reply_text})
         conversation_history[user_id] = conversation_history[user_id][-50:]
 
     except Exception as e:
-        print("❌ Ошибка GPT:", e)
+        print("❌ Ошибка при ответе:", e)
 
 def send_message(chat_id, text):
     try:
-        requests.post(TELEGRAM_API_URL, json={
+        response = requests.post(TELEGRAM_API_URL, json={
             "chat_id": chat_id,
             "text": text
         })
+        print("📨 Ответ Telegram:", response.status_code, response.text)
     except Exception as e:
-        print("❌ Ошибка отправки:", e)
+        print("❌ Ошибка отправки в Telegram:", e)
