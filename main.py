@@ -8,10 +8,11 @@ import time
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Храним диалоги, таймеры и время
+# Храним: историю, время, таймеры, флаг приветствия
 conversation_history = {}
 last_message_time = {}
 reply_timers = {}
+user_greeted = {}
 
 @app.route("/", methods=["GET"])
 def index():
@@ -22,31 +23,27 @@ def whatsapp_reply():
     user_number = request.values.get('From', '')
     incoming_msg = request.values.get('Body', '').strip()
 
-    # Команда для очистки памяти
     if incoming_msg.lower() == "memory_clean":
         conversation_history[user_number] = []
+        user_greeted[user_number] = False
         reply = MessagingResponse()
         reply.message("История диалога очищена. Можем начать заново 😊")
         return str(reply)
 
-    # Сохраняем время последнего сообщения
     last_message_time[user_number] = time.time()
 
-    # Если нет истории — создаём
     if user_number not in conversation_history:
         conversation_history[user_number] = []
 
-    # Если истории нет — приветствие
-    if not any(m["role"] == "assistant" for m in conversation_history[user_number]):
+    if user_greeted.get(user_number) != True:
+        user_greeted[user_number] = True
         reply = MessagingResponse()
         reply.message("Добрый день! ☺️ Чем можем помочь? Хотите кого-то поздравить? 😁")
         return str(reply)
 
-    # Добавляем новое сообщение в историю (после приветствия)
     conversation_history[user_number].append({"role": "user", "content": incoming_msg})
     conversation_history[user_number] = conversation_history[user_number][-50:]
 
-    # Если нет активного таймера — запускаем
     if user_number not in reply_timers or not reply_timers[user_number].is_alive():
         timer = threading.Timer(10.0, lambda: delayed_reply(user_number))
         reply_timers[user_number] = timer
@@ -56,11 +53,10 @@ def whatsapp_reply():
 
 def delayed_reply(user_number):
     if time.time() - last_message_time[user_number] < 10:
-        return  # пользователь ещё пишет
+        return
 
     history = conversation_history.get(user_number, [])
 
-    # Определим цену по номеру
     if user_number.startswith("whatsapp:+7"):
         price_info = "Стоимость создания песни — 6490 тенге 🇰🇿"
     elif user_number.startswith("whatsapp:+992"):
@@ -68,7 +64,6 @@ def delayed_reply(user_number):
     else:
         price_info = "Стоимость уточняется в зависимости от страны 🌍"
 
-    # Системный промт
     system_prompt = {
         "role": "system",
         "content": f"""
@@ -113,20 +108,17 @@ def delayed_reply(user_number):
         )
         reply_text = gpt_response.choices[0].message.content.strip()
 
-        # Отправка через Twilio
         from twilio.rest import Client as TwilioClient
-        twilio_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-        twilio_token = os.environ.get("TWILIO_AUTH_TOKEN")
-        whatsapp_from = os.environ.get("TWILIO_WHATSAPP_NUMBER")
-
-        twilio = TwilioClient(twilio_sid, twilio_token)
+        twilio = TwilioClient(
+            os.environ.get("TWILIO_ACCOUNT_SID"),
+            os.environ.get("TWILIO_AUTH_TOKEN")
+        )
         twilio.messages.create(
-            from_=whatsapp_from,
+            from_=os.environ.get("TWILIO_WHATSAPP_NUMBER"),
             to=user_number,
             body=reply_text
         )
 
-        # Обновляем историю
         conversation_history[user_number].append({"role": "assistant", "content": reply_text})
         conversation_history[user_number] = conversation_history[user_number][-50:]
 
