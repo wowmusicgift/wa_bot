@@ -200,7 +200,7 @@ def send_message(chat_id, text, thread_id=None):
 def notify_admin(client_chat_id, history):
     try:
         summary = f"🔔 Новый заказ от клиента {client_chat_id}\n\nПоследние сообщения:\n"
-        for h in history[-6:]:
+        for h in history:
             role = "👤" if h['role'] == "user" else "🤖"
             summary += f"{role} {h['content']}\n"
         send_message(ADMIN_CHAT_ID, summary.strip(), thread_id=ADMIN_TOPIC_ID)
