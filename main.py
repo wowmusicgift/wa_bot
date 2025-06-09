@@ -19,7 +19,7 @@ if not os.path.exists("credentials.json"):
             f.write(creds_env)
 
 app = Flask(__name__)
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+client = OpenAI()
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -233,9 +233,9 @@ def append_order_to_google_sheet(client_chat_id, username, history):
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-        client = gspread.authorize(creds)
+        sheet_client = gspread.authorize(creds)
 
-        sheet = client.open("Telegram Заказы").worksheet("Лист1")
+        sheet = sheet_client.open("Telegram Заказы").worksheet("Лист1")
         last_msgs = [h['content'] for h in history[-6:] if h['role'] == 'user']
         now = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
 
