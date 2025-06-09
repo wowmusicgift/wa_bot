@@ -237,28 +237,30 @@ def notify_admin(client_chat_id, username, history):
 def append_order_to_google_sheet(client_chat_id, username, history):
     try:
         print("📌 Начало записи в Google Таблицу...")
+
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
         sheet_client = gspread.authorize(creds)
 
         print("📌 Авторизация успешна. Открытие таблицы...")
-        spreadsheet = sheet_client.open("test")
-        sheets = spreadsheet.worksheets()
-        sheet_names = [s.title for s in sheets]
-        print("📄 Все листы:", sheet_names)
 
-        # Автоматически используем первый лист
-        sheet = sheets[0]
-        print(f"📄 Используется лист: {sheet.title}")
+        # Открытие по ID таблицы (надежнее, чем по имени)
+        spreadsheet = sheet_client.open_by_key("1AbCDeFGH1234567XYZ")  # <-- замени на свой ID
+        sheet_list = spreadsheet.worksheets()
+        print("📄 Все листы:", [s.title for s in sheet_list])
 
-        # Последние 6 сообщений пользователя
+        # Открытие нужного листа по названию
+        sheet = spreadsheet.worksheet("1")  # <-- замени на имя листа (обычно "Лист1" или "1")
+
+        # Подготовка данных
         last_msgs = [h['content'] for h in history[-6:] if h['role'] == 'user']
         now = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
-
         row = [str(client_chat_id), f"@{username}", now, " / ".join(last_msgs)]
+
         print("📌 Добавляем строку:", row)
         sheet.append_row(row)
         print("✅ Заказ записан в Google Таблицу.")
     except Exception as e:
         print("❌ Ошибка записи в Google Таблицу:", e)
+
 
