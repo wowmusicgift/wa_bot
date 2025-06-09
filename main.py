@@ -11,7 +11,9 @@ import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Создаем credentials.json из переменной окружения
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("HTTPS_PROXY", None)
+
 if not os.path.exists("credentials.json"):
     creds_env = os.environ.get("GOOGLE_CREDS_JSON")
     if creds_env:
@@ -20,7 +22,6 @@ if not os.path.exists("credentials.json"):
 
 app = Flask(__name__)
 
-# Инициализация клиента OpenAI (для openai>=1.0.0)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
