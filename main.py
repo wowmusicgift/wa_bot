@@ -6,7 +6,7 @@ from datetime import datetime
 
 import requests
 from flask import Flask, request
-import openai
+from openai import OpenAI
 import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -18,10 +18,8 @@ if not os.path.exists("credentials.json"):
         with open("credentials.json", "w") as f:
             f.write(creds_env)
 
-# Устанавливаем ключ OpenAI
-openai.api_key = os.environ.get("OPENAI_API_KEY")
-
 app = Flask(__name__)
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -165,15 +163,17 @@ def generate_gpt_reply(user_history):
     full_history += user_history
 
     try:
-        gpt_response = openai.ChatCompletion.create(
+        gpt_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=full_history,
             max_tokens=1000,
             temperature=0.9
         )
-        return gpt_response.choices[0].message.content.strip()
+        reply_text = gpt_response.choices[0].message.content.strip()
+        print("✅ GPT-ответ:", reply_text)
+        return reply_text
     except Exception as e:
-        print("❌ GPT error:", e)
+        print("❌ Ошибка GPT:", e)
         return "Извините, произошла ошибка. Попробуйте ещё раз позже."
 
 
@@ -191,8 +191,12 @@ def transcribe_voice(file_id):
             f.write(response.content)
 
         with open(temp_path, "rb") as audio_file:
-            transcription = openai.Audio.transcribe("whisper-1", audio_file)
-        return transcription["text"].strip()
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="text"
+            )
+        return transcription.strip()
 
     except Exception as e:
         print("❌ Ошибка распознавания голоса:", e)
