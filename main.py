@@ -2,6 +2,8 @@ from flask import Flask, request
 import requests
 from openai import OpenAI
 import os
+import threading
+import time
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -10,6 +12,10 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
 conversation_history = {}
+last_message_time = {}
+pending_timers = {}
+
+DELAY_SECONDS = 10
 
 @app.route("/")
 def home():
@@ -31,29 +37,40 @@ def telegram_webhook():
 
     user_id = str(chat_id)
 
-    # Команда очистки памяти
     if text.lower() == "memory_clean":
         conversation_history[user_id] = []
+        last_message_time[user_id] = time.time()
         send_message(chat_id, "История очищена. Можем начать заново 😊")
         return "ok"
 
-    # Инициализируем историю при первом сообщении
     if user_id not in conversation_history:
         conversation_history[user_id] = []
         send_message(chat_id, "Добрый день! ☺️ Чем можем помочь? Хотите кого-то поздравить? 😁")
 
-    # Добавляем новое сообщение
     conversation_history[user_id].append({"role": "user", "content": text})
     conversation_history[user_id] = conversation_history[user_id][-50:]
+    last_message_time[user_id] = time.time()
 
-    # Получаем ответ от GPT
-    reply = generate_gpt_reply(conversation_history[user_id])
-    if reply:
-        conversation_history[user_id].append({"role": "assistant", "content": reply})
-        conversation_history[user_id] = conversation_history[user_id][-50:]
-        send_message(chat_id, reply)
+    # отменяем предыдущий таймер, если он был
+    if user_id in pending_timers:
+        pending_timers[user_id].cancel()
+
+    # запускаем новый таймер
+    timer = threading.Timer(DELAY_SECONDS, process_delayed_reply, args=(user_id, chat_id))
+    timer.start()
+    pending_timers[user_id] = timer
 
     return "ok"
+
+def process_delayed_reply(user_id, chat_id):
+    # Проверяем, прошло ли 10 секунд с последнего сообщения
+    if time.time() - last_message_time[user_id] >= DELAY_SECONDS:
+        reply = generate_gpt_reply(conversation_history[user_id])
+        if reply:
+            conversation_history[user_id].append({"role": "assistant", "content": reply})
+            conversation_history[user_id] = conversation_history[user_id][-50:]
+            send_message(chat_id, reply)
+        pending_timers.pop(user_id, None)
 
 def generate_gpt_reply(user_history):
     system_prompt = {
@@ -75,6 +92,10 @@ def generate_gpt_reply(user_history):
 – Что именно нужно: песня, стих, поздравление? 🎶
 – Какие чувства хочется передать? ❤️
 – Есть ли особенные слова или моменты? 📝
+
+Если клиент интересуется ценой — сначала уточните, из какой он страны (например: “Подскажите, пожалуйста, вы из Казахстана или Таджикистана? Это нужно для расчёта стоимости 😊”). Затем сообщите:
+– Для Казахстана 🇰🇿 цена — 6490 тенге;
+– Для Таджикистана 🇹🇯 — 169 сомони.
 
 Если спрашивают, когда будет готово — сообщите: “Мы создаём песню в течение дня 🎶”
 
