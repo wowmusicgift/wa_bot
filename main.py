@@ -19,6 +19,12 @@ if not os.path.exists("credentials.json"):
             f.write(creds_env)
 
 app = Flask(__name__)
+
+os.environ.pop("http_proxy", None)
+os.environ.pop("https_proxy", None)
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("HTTPS_PROXY", None)
+
 client = OpenAI()
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
