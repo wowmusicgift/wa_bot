@@ -244,13 +244,13 @@ def append_order_to_google_sheet(client_chat_id, username, history):
 
         print("📌 Авторизация успешна. Открытие таблицы...")
 
-        # Открытие по ID таблицы (надежнее, чем по имени)
-        spreadsheet = sheet_client.open_by_key("1AbCDeFGH1234567XYZ")  # <-- замени на свой ID
+        # Открытие по ID таблицы
+        spreadsheet = sheet_client.open_by_key("16PtWH2dcR5bIeIQeBxsr8nOePKO7p6LMveKLse1N40s")
         sheet_list = spreadsheet.worksheets()
         print("📄 Все листы:", [s.title for s in sheet_list])
 
-        # Открытие нужного листа по названию
-        sheet = spreadsheet.worksheet("1")  # <-- замени на имя листа (обычно "Лист1" или "1")
+        # Обращение к первому листу (по индексу)
+        sheet = spreadsheet.get_worksheet(0)
 
         # Подготовка данных
         last_msgs = [h['content'] for h in history[-6:] if h['role'] == 'user']
@@ -262,5 +262,6 @@ def append_order_to_google_sheet(client_chat_id, username, history):
         print("✅ Заказ записан в Google Таблицу.")
     except Exception as e:
         print("❌ Ошибка записи в Google Таблицу:", e)
+
 
 
