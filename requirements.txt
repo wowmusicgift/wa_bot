@@ -1,5 +1,6 @@
 flask
-openai>=1.0.0
 gunicorn
+openai>=1.0.0
 requests
 pytz
+python-dotenv
