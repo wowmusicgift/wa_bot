@@ -6,6 +6,8 @@ import threading
 import time
 from datetime import datetime
 import pytz
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -22,9 +24,11 @@ pending_timers = {}
 DELAY_SECONDS = 10
 TIMEZONE = pytz.timezone("Asia/Almaty")
 
+
 @app.route("/")
 def home():
     return "🤖 Telegram бот работает!"
+
 
 @app.route("/webhook", methods=["POST"])
 def telegram_webhook():
@@ -40,6 +44,7 @@ def telegram_webhook():
         return "ok"
 
     user_id = str(chat_id)
+    username = message["from"].get("username", "—")
     text = ""
 
     if "voice" in message:
@@ -76,17 +81,19 @@ def telegram_webhook():
     if user_id in pending_timers:
         pending_timers[user_id].cancel()
 
-    timer = threading.Timer(DELAY_SECONDS, process_delayed_reply, args=(user_id, chat_id))
+    timer = threading.Timer(DELAY_SECONDS, process_delayed_reply, args=(user_id, chat_id, username))
     timer.start()
     pending_timers[user_id] = timer
 
     return "ok"
 
+
 def is_late_evening_or_night():
     now = datetime.now(TIMEZONE)
     return now.hour >= 22 or now.hour < 8
 
-def process_delayed_reply(user_id, chat_id):
+
+def process_delayed_reply(user_id, chat_id, username):
     if time.time() - last_message_time[user_id] >= DELAY_SECONDS:
         reply = generate_gpt_reply(conversation_history[user_id])
         if reply:
@@ -94,8 +101,9 @@ def process_delayed_reply(user_id, chat_id):
             conversation_history[user_id] = conversation_history[user_id][-50:]
             send_message(chat_id, reply)
             if "мы начинаем работу" in reply.lower() or "начинаем работу" in reply.lower():
-                notify_admin(chat_id, conversation_history[user_id])
+                notify_admin(chat_id, username, conversation_history[user_id])
         pending_timers.pop(user_id, None)
+
 
 def generate_gpt_reply(user_history):
     system_prompt = {
@@ -159,6 +167,7 @@ def generate_gpt_reply(user_history):
         print("❌ Ошибка GPT:", e)
         return "Извините, произошла ошибка. Попробуйте ещё раз позже."
 
+
 def transcribe_voice(file_id):
     try:
         file_info = requests.get(
@@ -184,6 +193,7 @@ def transcribe_voice(file_id):
         print("❌ Ошибка распознавания голоса:", e)
         return None
 
+
 def send_message(chat_id, text, thread_id=None):
     try:
         payload = {
@@ -197,12 +207,31 @@ def send_message(chat_id, text, thread_id=None):
     except Exception as e:
         print("❌ Ошибка отправки в Telegram:", e)
 
-def notify_admin(client_chat_id, history):
+
+def notify_admin(client_chat_id, username, history):
     try:
-        summary = f"🔔 Новый заказ от клиента {client_chat_id}\n\nПоследние сообщения:\n"
-        for h in history:
+        summary = f"🔔 Новый заказ от клиента {client_chat_id} (@{username})\n\nПоследние сообщения:\n"
+        for h in history[-6:]:
             role = "👤" if h['role'] == "user" else "🤖"
             summary += f"{role} {h['content']}\n"
         send_message(ADMIN_CHAT_ID, summary.strip(), thread_id=ADMIN_TOPIC_ID)
+        append_order_to_google_sheet(client_chat_id, username, history)
     except Exception as e:
         print("❌ Ошибка уведомления оператора:", e)
+
+
+def append_order_to_google_sheet(client_chat_id, username, history):
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+        client = gspread.authorize(creds)
+
+        sheet = client.open("Telegram Заказы").sheet1
+        last_msgs = [h['content'] for h in history[-6:] if h['role'] == 'user']
+        now = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
+
+        row = [str(client_chat_id), f"@{username}", now, " / ".join(last_msgs)]
+        sheet.append_row(row)
+        print("✅ Заказ записан в Google Таблицу.")
+    except Exception as e:
+        print("❌ Ошибка записи в Google Таблицу:", e)
