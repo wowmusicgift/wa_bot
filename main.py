@@ -11,7 +11,6 @@ import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Создаем credentials.json из переменной окружения
 if not os.path.exists("credentials.json"):
     creds_env = os.environ.get("GOOGLE_CREDS_JSON")
     if creds_env:
@@ -147,17 +146,10 @@ def generate_gpt_reply(user_history):
 Вы не ИИ — вы настоящая команда.
 """
     }
-
     full_history = [system_prompt]
-
     if is_late_evening_or_night():
-        full_history.append({
-            "role": "system",
-            "content": "Клиент написал ночью. Напомните, что песня будет готова в рабочее время, не позже следующего дня."
-        })
-
+        full_history.append({"role": "system", "content": "Клиент написал ночью. Напомните, что песня будет готова в рабочее время, не позже следующего дня."})
     full_history += user_history
-
     try:
         gpt_response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -165,12 +157,30 @@ def generate_gpt_reply(user_history):
             max_tokens=1000,
             temperature=0.9
         )
-        reply_text = gpt_response.choices[0].message.content.strip()
-        print("✅ GPT-ответ:", reply_text)
-        return reply_text
+        return gpt_response.choices[0].message.content.strip()
     except Exception as e:
         print("❌ Ошибка GPT:", e)
         return "Извините, произошла ошибка. Попробуйте ещё раз позже."
+
+def generate_song_text(history):
+    prompt = {
+        "role": "system",
+        "content": """
+Вы — профессиональный автор песен. На основе истории клиента напишите красивый текст песни с обозначениями частей: [Verse 1], [Chorus], [Verse 2], [Bridge], [Final]. Пишите с душой, поэтично и искренне, обращаясь к человеку, которому песня посвящена. Упоминайте имена, важные моменты и чувства.
+"""
+    }
+    user_messages = [h for h in history if h["role"] == "user"]
+    try:
+        result = openai.chat.completions.create(
+            model="gpt-4",
+            messages=[prompt] + user_messages,
+            max_tokens=1200,
+            temperature=0.85
+        )
+        return result.choices[0].message.content.strip()
+    except Exception as e:
+        print("❌ Ошибка генерации песни:", e)
+        return None
 
 def transcribe_voice(file_id):
     try:
@@ -209,12 +219,23 @@ def send_message(chat_id, text, thread_id=None):
 
 def notify_admin(client_chat_id, username, history):
     try:
-        summary = f"🔔 Новый заказ от клиента {client_chat_id} (@{username})\n\nПоследние сообщения:\n"
+        summary = f"🔔 Новый заказ от клиента {client_chat_id} (@{username})
+
+Последние сообщения:
+"
         for h in history[-6:]:
             role = "👤" if h['role'] == "user" else "🤖"
-            summary += f"{role} {h['content']}\n"
+            summary += f"{role} {h['content']}
+"
         send_message(ADMIN_CHAT_ID, summary.strip(), thread_id=ADMIN_TOPIC_ID)
         append_order_to_google_sheet(client_chat_id, username, history)
+
+        # Генерация текста песни сразу после заказа
+        song_text = generate_song_text(history)
+        if song_text:
+            send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:
+
+{song_text}", thread_id=ADMIN_TOPIC_ID)
     except Exception as e:
         print("❌ Ошибка уведомления оператора:", e)
 
