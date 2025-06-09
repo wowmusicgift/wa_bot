@@ -242,10 +242,16 @@ def append_order_to_google_sheet(client_chat_id, username, history):
         sheet_client = gspread.authorize(creds)
 
         print("📌 Авторизация успешна. Открытие таблицы...")
-        sheet_list = sheet_client.open("test").worksheets()
-        print("📄 Все листы:", [s.title for s in sheet_list])
+        spreadsheet = sheet_client.open("test")
+        sheets = spreadsheet.worksheets()
+        sheet_names = [s.title for s in sheets]
+        print("📄 Все листы:", sheet_names)
 
-        sheet = sheet_client.open_by_key("1AbCDeFGH1234567XYZ").worksheet("1")
+        # Автоматически используем первый лист
+        sheet = sheets[0]
+        print(f"📄 Используется лист: {sheet.title}")
+
+        # Последние 6 сообщений пользователя
         last_msgs = [h['content'] for h in history[-6:] if h['role'] == 'user']
         now = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -255,3 +261,4 @@ def append_order_to_google_sheet(client_chat_id, username, history):
         print("✅ Заказ записан в Google Таблицу.")
     except Exception as e:
         print("❌ Ошибка записи в Google Таблицу:", e)
+
