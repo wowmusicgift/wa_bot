@@ -6,14 +6,10 @@ from datetime import datetime
 
 import requests
 from flask import Flask, request
-from openai import OpenAI
-from openai._utils import _remove_proxies_from_environment
+import openai
 import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-
-# Удаление всех прокси, включая системные, для корректной работы OpenAI SDK
-_remove_proxies_from_environment()
 
 # Создаем credentials.json из переменной окружения
 if not os.path.exists("credentials.json"):
@@ -24,7 +20,7 @@ if not os.path.exists("credentials.json"):
 
 app = Flask(__name__)
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -163,7 +159,7 @@ def generate_gpt_reply(user_history):
     full_history += user_history
 
     try:
-        gpt_response = client.chat.completions.create(
+        gpt_response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=full_history,
             max_tokens=1000,
@@ -188,7 +184,7 @@ def transcribe_voice(file_id):
             f.write(response.content)
 
         with open(temp_path, "rb") as audio_file:
-            transcription = client.audio.transcriptions.create(
+            transcription = openai.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
                 response_format="text"
