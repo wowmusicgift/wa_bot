@@ -6,7 +6,7 @@ from datetime import datetime
 
 import requests
 from flask import Flask, request
-from openai import OpenAI
+import openai
 import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -20,8 +20,8 @@ if not os.path.exists("credentials.json"):
 
 app = Flask(__name__)
 
-# Инициализация клиента OpenAI (для версии 1.30.1)
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# Инициализация ключа OpenAI (новый способ для версии 1.30.1)
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -35,11 +35,9 @@ pending_timers = {}
 DELAY_SECONDS = 10
 TIMEZONE = pytz.timezone("Asia/Almaty")
 
-
 @app.route("/")
 def home():
     return "🤖 Telegram бот работает!"
-
 
 @app.route("/webhook", methods=["POST"])
 def telegram_webhook():
@@ -98,11 +96,9 @@ def telegram_webhook():
 
     return "ok"
 
-
 def is_late_evening_or_night():
     now = datetime.now(TIMEZONE)
     return now.hour >= 22 or now.hour < 8
-
 
 def process_delayed_reply(user_id, chat_id, username):
     if time.time() - last_message_time[user_id] >= DELAY_SECONDS:
@@ -114,7 +110,6 @@ def process_delayed_reply(user_id, chat_id, username):
             if "мы начинаем работу" in reply.lower() or "начинаем работу" in reply.lower():
                 notify_admin(chat_id, username, conversation_history[user_id])
         pending_timers.pop(user_id, None)
-
 
 def generate_gpt_reply(user_history):
     system_prompt = {
@@ -165,25 +160,22 @@ def generate_gpt_reply(user_history):
     full_history += user_history
 
     try:
-        gpt_response = client.chat.completions.create(
+        gpt_response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=full_history,
             max_tokens=1000,
             temperature=0.9
         )
-        reply_text = gpt_response.choices[0].message.content.strip()
+        reply_text = gpt_response["choices"][0]["message"]["content"].strip()
         print("✅ GPT-ответ:", reply_text)
         return reply_text
     except Exception as e:
         print("❌ Ошибка GPT:", e)
         return "Извините, произошла ошибка. Попробуйте ещё раз позже."
 
-
 def transcribe_voice(file_id):
     try:
-        file_info = requests.get(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getFile?file_id={file_id}"
-        ).json()
+        file_info = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getFile?file_id={file_id}").json()
         file_path = file_info["result"]["file_path"]
         file_url = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}"
 
@@ -193,17 +185,15 @@ def transcribe_voice(file_id):
             f.write(response.content)
 
         with open(temp_path, "rb") as audio_file:
-            transcription = client.audio.transcriptions.create(
+            transcription = openai.Audio.transcribe(
                 model="whisper-1",
                 file=audio_file,
                 response_format="text"
             )
         return transcription.strip()
-
     except Exception as e:
         print("❌ Ошибка распознавания голоса:", e)
         return None
-
 
 def send_message(chat_id, text, thread_id=None):
     try:
@@ -218,7 +208,6 @@ def send_message(chat_id, text, thread_id=None):
     except Exception as e:
         print("❌ Ошибка отправки в Telegram:", e)
 
-
 def notify_admin(client_chat_id, username, history):
     try:
         summary = f"🔔 Новый заказ от клиента {client_chat_id} (@{username})\n\nПоследние сообщения:\n"
@@ -229,7 +218,6 @@ def notify_admin(client_chat_id, username, history):
         append_order_to_google_sheet(client_chat_id, username, history)
     except Exception as e:
         print("❌ Ошибка уведомления оператора:", e)
-
 
 def append_order_to_google_sheet(client_chat_id, username, history):
     try:
