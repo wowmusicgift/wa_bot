@@ -1,3 +1,13 @@
+import json
+
+# Создаем credentials.json из переменной окружения
+if not os.path.exists("credentials.json"):
+    creds_env = os.environ.get("GOOGLE_CREDS_JSON")
+    if creds_env:
+        with open("credentials.json", "w") as f:
+            f.write(creds_env)
+
+
 from flask import Flask, request
 import requests
 from openai import OpenAI
