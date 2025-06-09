@@ -226,7 +226,7 @@ def append_order_to_google_sheet(client_chat_id, username, history):
         sheet_client = gspread.authorize(creds)
 
         print("📌 Авторизация успешна. Открытие таблицы...")
-        sheet = sheet_client.open("Telegram Заказы").worksheet("Лист1")
+        sheet = sheet_client.open("test").worksheet("1")
         last_msgs = [h['content'] for h in history[-6:] if h['role'] == 'user']
         now = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
 
