@@ -7,13 +7,15 @@ from datetime import datetime
 import requests
 from flask import Flask, request
 from openai import OpenAI
+from openai._utils import _remove_proxies_from_environment
 import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-os.environ.pop("HTTP_PROXY", None)
-os.environ.pop("HTTPS_PROXY", None)
+# Удаление всех прокси, включая системные, для корректной работы OpenAI SDK
+_remove_proxies_from_environment()
 
+# Создаем credentials.json из переменной окружения
 if not os.path.exists("credentials.json"):
     creds_env = os.environ.get("GOOGLE_CREDS_JSON")
     if creds_env:
