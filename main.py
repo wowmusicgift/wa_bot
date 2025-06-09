@@ -219,7 +219,11 @@ def send_message(chat_id, text, thread_id=None):
 
 def notify_admin(client_chat_id, username, history):
     try:
-        summary = f"🔔 Новый заказ от клиента {client_chat_id} (@{username})
+        summary = (
+    f"🔔 Новый заказ от клиента {client_chat_id} (@{username})\n\n"
+    "Последние сообщения:\n"
+)
+
 
 Последние сообщения:
 "
