@@ -20,12 +20,8 @@ if not os.path.exists("credentials.json"):
 
 app = Flask(__name__)
 
-os.environ.pop("http_proxy", None)
-os.environ.pop("https_proxy", None)
-os.environ.pop("HTTP_PROXY", None)
-os.environ.pop("HTTPS_PROXY", None)
-
-client = OpenAI()
+# Инициализация клиента OpenAI (для версии 1.30.1)
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
