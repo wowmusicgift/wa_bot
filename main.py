@@ -1,4 +1,15 @@
+import os
 import json
+import threading
+import time
+from datetime import datetime
+
+import requests
+from flask import Flask, request
+from openai import OpenAI
+import pytz
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # Создаем credentials.json из переменной окружения
 if not os.path.exists("credentials.json"):
@@ -6,18 +17,6 @@ if not os.path.exists("credentials.json"):
     if creds_env:
         with open("credentials.json", "w") as f:
             f.write(creds_env)
-
-
-from flask import Flask, request
-import requests
-from openai import OpenAI
-import os
-import threading
-import time
-from datetime import datetime
-import pytz
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
