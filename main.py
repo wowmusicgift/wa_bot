@@ -219,27 +219,18 @@ def send_message(chat_id, text, thread_id=None):
 
 def notify_admin(client_chat_id, username, history):
     try:
-        summary = (
-    f"🔔 Новый заказ от клиента {client_chat_id} (@{username})\n\n"
-    "Последние сообщения:\n"
-)
-
-
-Последние сообщения:
-"
+        summary = f"🔔 Новый заказ от клиента {client_chat_id} (@{username})\n\nПоследние сообщения:\n"
         for h in history[-6:]:
             role = "👤" if h['role'] == "user" else "🤖"
-            summary += f"{role} {h['content']}
-"
+            summary += f"{role} {h['content']}\n"
+
         send_message(ADMIN_CHAT_ID, summary.strip(), thread_id=ADMIN_TOPIC_ID)
         append_order_to_google_sheet(client_chat_id, username, history)
 
         # Генерация текста песни сразу после заказа
         song_text = generate_song_text(history)
         if song_text:
-            send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:
-
-{song_text}", thread_id=ADMIN_TOPIC_ID)
+            send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:\n\n{song_text}", thread_id=ADMIN_TOPIC_ID)
     except Exception as e:
         print("❌ Ошибка уведомления оператора:", e)
 
