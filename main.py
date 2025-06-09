@@ -12,8 +12,8 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-ADMIN_CHAT_ID = -1002351934678  # ID группы
-TOPIC_ID = 21753  # ID темы форума
+ADMIN_CHAT_ID = "-1002351934678"
+ADMIN_THREAD_ID = 21753  # ID темы в супергруппе
 
 conversation_history = {}
 last_message_time = {}
@@ -101,8 +101,7 @@ def generate_gpt_reply(user_history):
     system_prompt = {
         "role": "system",
         "content": """
-Вы — команда профессиональных авторов песен и поздравлений. Общаетесь в Telegram от лица команды: “мы с радостью создадим…”, “наша команда поможет…”. Обращаетесь к клиенту на “вы”, доброжелательно, с уважением и лёгкими смайликами 😊
-... (оставьте как есть, обрезал для краткости)
+Вы — команда профессиональных авторов песен и поздравлений. Общаетесь в Telegram от лица команды… [сокращено для краткости]
 """
     }
 
@@ -123,9 +122,11 @@ def generate_gpt_reply(user_history):
             max_tokens=1000,
             temperature=0.9
         )
-        return gpt_response.choices[0].message.content.strip()
+        reply_text = gpt_response.choices[0].message.content.strip()
+        print("\u2705 GPT-ответ:", reply_text)
+        return reply_text
     except Exception as e:
-        print("❌ Ошибка GPT:", e)
+        print("\u274c Ошибка GPT:", e)
         return "Извините, произошла ошибка. Попробуйте ещё раз позже."
 
 def transcribe_voice(file_id):
@@ -150,7 +151,7 @@ def transcribe_voice(file_id):
         return transcription.strip()
 
     except Exception as e:
-        print("❌ Ошибка распознавания голоса:", e)
+        print("\u274c Ошибка распознавания голоса:", e)
         return None
 
 def send_message(chat_id, text, thread_id=None):
@@ -163,17 +164,16 @@ def send_message(chat_id, text, thread_id=None):
 
     try:
         response = requests.post(TELEGRAM_API_URL, json=payload)
-        print("📨 Ответ Telegram:", response.status_code, response.text)
+        print("\ud83d\udce8 Ответ Telegram:", response.status_code, response.text)
     except Exception as e:
-        print("❌ Ошибка отправки в Telegram:", e)
+        print("\u274c Ошибка отправки в Telegram:", e)
 
 def notify_admin(client_chat_id, history):
     try:
-        summary = f"🔔 Новый заказ от клиента {client_chat_id}\n\nПоследние сообщения:\n"
+        summary = f"\ud83d\udd14 Новый заказ от клиента {client_chat_id}\n\nПоследние сообщения:\n"
         for h in history[-6:]:
-            role = "👤" if h['role'] == "user" else "🧐"
+            role = "\ud83d\udc64" if h['role'] == "user" else "\ud83e\udde0"
             summary += f"{role} {h['content']}\n"
-
-        send_message(ADMIN_CHAT_ID, summary.strip(), thread_id=TOPIC_ID)
+        send_message(ADMIN_CHAT_ID, summary.strip(), thread_id=ADMIN_THREAD_ID)
     except Exception as e:
-        print("❌ Ошибка уведомления оператора:", e)
+        print("\u274c Ошибка уведомления оператора:", e)
