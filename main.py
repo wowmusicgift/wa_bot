@@ -303,10 +303,11 @@ def admin_panel():
 def send_manual_message():
     chat_id = request.form["chat_id"]
     text = request.form["text"]
-    send_message(chat_id, f"👋 Оператор: {text}")
+    send_message(chat_id, text)
     if chat_id not in conversation_history:
         conversation_history[chat_id] = []
-    conversation_history[chat_id].append({"role": "assistant", "content": f"👋 Оператор: {text}"})
+    conversation_history[chat_id].append({"role": "assistant", "content": text})
     return "Сообщение отправлено. <a href='/admin'>Назад</a>"
+
 
 
