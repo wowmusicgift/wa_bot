@@ -151,7 +151,7 @@ def generate_gpt_reply(user_history):
     full_history += user_history
     try:
         gpt_response = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=full_history,
             max_tokens=1000,
             temperature=0.9
@@ -171,7 +171,7 @@ def generate_song_text(history):
     user_messages = [h for h in history if h["role"] == "user"]
     try:
         result = openai.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[prompt] + user_messages,
             max_tokens=1200,
             temperature=0.85
