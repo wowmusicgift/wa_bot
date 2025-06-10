@@ -3,13 +3,13 @@ import json
 import threading
 import time
 from datetime import datetime
-
 import requests
 from flask import Flask, request
 import openai
 import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from flask import render_template_string
 
 if not os.path.exists("credentials.json"):
     creds_env = os.environ.get("GOOGLE_CREDS_JSON")
@@ -262,5 +262,51 @@ def append_order_to_google_sheet(client_chat_id, username, history):
     except Exception as e:
         print("❌ Ошибка записи в Google Таблицу:", e)
 
+# Шаблон HTML-панели
+ADMIN_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Админ-панель</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>Активные клиенты</h1>
+    {% for user_id, history in history_dict.items() %}
+        <div style="border:1px solid #ccc; padding:10px; margin-bottom:20px;">
+            <h2>Клиент: {{ user_id }}</h2>
+            <div>
+                {% for msg in history %}
+                    {% if msg.role == "user" %}
+                        <p><b>👤 Клиент:</b> {{ msg.content }}</p>
+                    {% else %}
+                        <p><b>🤖 Бот:</b> {{ msg.content }}</p>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <form method="post" action="/send_manual">
+                <input type="hidden" name="chat_id" value="{{ user_id }}">
+                <input type="text" name="text" placeholder="Сообщение клиенту..." style="width:80%;">
+                <button type="submit">Отправить</button>
+            </form>
+        </div>
+    {% endfor %}
+</body>
+</html>
+"""
+
+@app.route("/admin", methods=["GET"])
+def admin_panel():
+    return render_template_string(ADMIN_TEMPLATE, history_dict=conversation_history)
+
+@app.route("/send_manual", methods=["POST"])
+def send_manual_message():
+    chat_id = request.form["chat_id"]
+    text = request.form["text"]
+    send_message(chat_id, f"👋 Оператор: {text}")
+    if chat_id not in conversation_history:
+        conversation_history[chat_id] = []
+    conversation_history[chat_id].append({"role": "assistant", "content": f"👋 Оператор: {text}"})
+    return "Сообщение отправлено. <a href='/admin'>Назад</a>"
 
 
