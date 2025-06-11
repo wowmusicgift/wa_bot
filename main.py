@@ -116,7 +116,7 @@ def send_message(to_number, text):
         }
         data = {
             "messaging_product": "whatsapp",
-            "to": to_number,
+            "to": f"+{to_number}" if not to_number.startswith("+") else to_number,
             "type": "text",
             "text": {"body": text}
         }
