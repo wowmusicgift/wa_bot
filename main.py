@@ -201,7 +201,7 @@ def notify_admin(client_chat_id, history):
 
         # Составляем краткое сообщение с последними 6 сообщениями
         summary = f"🔔 Новый заказ от клиента {client_chat_id}\n\n"
-        for h in history[-6:]:
+        for h in history[-50:]:
             if isinstance(h, dict) and "role" in h and "content" in h:
                 role = "👤" if h["role"] == "user" else "🤖"
                 summary += f"{role} {h['content']}\n"
