@@ -117,8 +117,8 @@ def send_message(to, text, platform="whatsapp"):
                 "Content-Type": "application/json"
             }
             # Универсальная замена номера с +77 на 87
-            if to.startswith("+77"):
-                to = "787" + to[3:]
+            if to.startswith("77"):
+                to = "787" + to[2:]
                 
             print("CORRECT WA_ID: ", to)
             data = {
