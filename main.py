@@ -199,22 +199,26 @@ def notify_admin(client_chat_id, history):
     try:
         print("🚀 notify_admin активирован")
 
+        # Составляем краткое сообщение с последними 6 сообщениями
         summary = f"🔔 Новый заказ от клиента {client_chat_id}\n\n"
         for h in history[-6:]:
-            if "role" in h:
-                role = "👤" if h['role'] == "user" else "🤖"
+            if isinstance(h, dict) and "role" in h and "content" in h:
+                role = "👤" if h["role"] == "user" else "🤖"
                 summary += f"{role} {h['content']}\n"
 
+        # Отправляем уведомление в Telegram
         send_message(ADMIN_CHAT_ID, summary.strip(), platform="telegram")
+
+        # Запись в Google Таблицу
         append_order_to_google_sheet(client_chat_id, history)
 
+        # Генерация текста песни
         song_text = generate_song_text(history)
         if song_text:
             send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:\n\n{song_text}", platform="telegram")
 
     except Exception as e:
         print("Ошибка уведомления оператора:", e)
-
         
 
 def append_order_to_google_sheet(client_chat_id, history):
