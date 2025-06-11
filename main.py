@@ -21,7 +21,7 @@ WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID")
 WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN")
 WHATSAPP_API_URL = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
 
-ADMIN_CHAT_ID = "+77776521906"
+ADMIN_CHAT_ID = "787776521906"
 TIMEZONE = pytz.timezone("Asia/Almaty")
 conversation_history = {}
 last_message_time = {}
@@ -43,20 +43,10 @@ def home():
 @app.route("/webhook", methods=["GET", "POST"])
 def whatsapp_webhook():
     if request.method == "GET":
-        print("👉 Токен из запроса:", request.args.get("hub.verify_token"))
-        print("🛠️ Токен из переменной:", WHATSAPP_VERIFY_TOKEN)
-        
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
-
-        print("🔐 Проверка Webhook")
-        print("👉 Токен из запроса:", token)
-        print("🛠️ Токен из переменной:", WHATSAPP_VERIFY_TOKEN)
-        print("🎯 Challenge:", challenge)
-
         if token and challenge and token == WHATSAPP_VERIFY_TOKEN:
             return challenge, 200
-            
         return "Ошибка верификации", 403
 
     data = request.get_json()
@@ -105,7 +95,7 @@ def process_delayed_reply(user_id):
             conversation_history[user_id] = conversation_history[user_id][-50:]
             send_message(user_id, reply)
             if "мы начинаем работу" in reply.lower():
-                notify_admin(user_id, conversation_history[user_id])
+                notify_admin("787776521906", conversation_history[user_id])
         pending_timers.pop(user_id, None)
 
 def send_message(to_number, text):
@@ -114,6 +104,9 @@ def send_message(to_number, text):
             "Authorization": f"Bearer {WHATSAPP_TOKEN}",
             "Content-Type": "application/json"
         }
+        # Принудительно изменим формат номера для отправки
+        if to_number == "77776521906":
+            to_number = "787776521906"
         data = {
             "messaging_product": "whatsapp",
             "to": to_number,
@@ -174,6 +167,7 @@ def generate_gpt_reply(user_history):
     except Exception as e:
         print("Ошибка GPT:", e)
         return "Извините, произошла ошибка. Попробуйте ещё раз позже."
+
 
 def notify_admin(client_chat_id, history):
     try:
