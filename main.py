@@ -48,7 +48,7 @@ def whatsapp_webhook():
         return "Ошибка верификации", 403
 
     data = request.get_json()
-    print("\ud83d\udce5 Получено сообщение:", json.dumps(data, indent=2))
+    print("📥 Получено сообщение:", json.dumps(data, indent=2, ensure_ascii=False))
     try:
         entry = data["entry"][0]
         changes = entry["changes"][0]
@@ -109,9 +109,9 @@ def send_message(to_number, text):
             "text": {"body": text}
         }
         response = requests.post(WHATSAPP_API_URL, headers=headers, json=data)
-        print("\ud83d\udce8 Ответ WhatsApp:", response.status_code, response.text)
+        print("Ответ WhatsApp:", response.status_code, response.text)
     except Exception as e:
-        print("\u274c Ошибка отправки WhatsApp:", e)
+        print("Ошибка отправки WhatsApp:", e)
 
 def generate_gpt_reply(user_history):
     system_prompt = {
@@ -160,7 +160,7 @@ def generate_gpt_reply(user_history):
         )
         return gpt_response.choices[0].message.content.strip()
     except Exception as e:
-        print("\u274c Ошибка GPT:", e)
+        print("Ошибка GPT:", e)
         return "Извините, произошла ошибка. Попробуйте ещё раз позже."
 
 def notify_admin(client_chat_id, history):
@@ -176,11 +176,11 @@ def notify_admin(client_chat_id, history):
         if song_text:
             send_message(ADMIN_CHAT_ID, f"\ud83c\udfb5 Готовый текст песни:\n\n{song_text}")
     except Exception as e:
-        print("\u274c Ошибка уведомления оператора:", e)
+        print("Ошибка уведомления оператора:", e)
 
 def append_order_to_google_sheet(client_chat_id, history):
     try:
-        print("\ud83d\udccc Запись в Google Таблицу...")
+        print("Запись в Google Таблицу...")
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
         sheet_client = gspread.authorize(creds)
@@ -191,7 +191,7 @@ def append_order_to_google_sheet(client_chat_id, history):
         sheet.append_row(row)
         print("✅ Заказ записан.")
     except Exception as e:
-        print("\u274c Ошибка записи в таблицу:", e)
+        print("Ошибка записи в таблицу:", e)
 
 def generate_song_text(history):
     try:
@@ -208,7 +208,7 @@ def generate_song_text(history):
         )
         return result.choices[0].message.content.strip()
     except Exception as e:
-        print("\u274c Ошибка генерации песни:", e)
+        print("Ошибка генерации песни:", e)
         return None
 
 ADMIN_TEMPLATE = """
