@@ -21,7 +21,7 @@ WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID")
 WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN")
 WHATSAPP_API_URL = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
 
-ADMIN_CHAT_ID = "787776521906"
+ADMIN_CHAT_ID = "-4877024070"
 TIMEZONE = pytz.timezone("Asia/Almaty")
 conversation_history = {}
 last_message_time = {}
