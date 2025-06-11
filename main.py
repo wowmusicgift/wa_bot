@@ -59,8 +59,24 @@ def whatsapp_webhook():
         if messages:
             msg = messages[0]
             wa_id = msg["from"]
-            text = msg["text"]["body"].strip()
-            handle_user_message(wa_id, text)
+            msg_type = msg.get("type")
+
+            if msg_type == "text":
+                text = msg["text"]["body"].strip()
+                handle_user_message(wa_id, text)
+            
+            elif msg_type == "audio" or (msg_type == "voice"):  # поддержка голосовых
+                try:
+                    media_id = msg[msg_type]["id"]
+                    text = transcribe_audio(media_id)
+                    if text:
+                        handle_user_message(wa_id, text)
+                        send_message(wa_id, f"✅ Голосовое сообщение распознано:\n{text}")
+                    else:
+                        send_message(wa_id, "❌ Не удалось распознать голосовое сообщение 😔")
+                except Exception as e:
+                    print("Ошибка голосового сообщения:", e)
+
     except Exception as e:
         print("Ошибка обработки сообщения:", e)
     return "ok", 200
@@ -260,7 +276,48 @@ def generate_song_text(history):
     except Exception as e:
         print("Ошибка генерации песни:", e)
         return None
+        
 
+def transcribe_audio(media_id):
+    try:
+        print("🎙 Распознаём голосовое...")
+
+        # Получаем URL для скачивания медиа
+        url = f"https://graph.facebook.com/v18.0/{media_id}"
+        headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
+        res = requests.get(url, headers=headers)
+        media_url = res.json().get("url")
+
+        # Уникальное имя файла
+        filename = f"voice_{media_id}.ogg"
+
+        # Скачиваем голосовое сообщение
+        audio_data = requests.get(media_url, headers=headers).content
+        with open(filename, "wb") as f:
+            f.write(audio_data)
+
+        # Распознаём через Whisper
+        with open(filename, "rb") as audio_file:
+            transcript = openai.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="text",
+                language="ru"
+            )
+
+        return transcript.strip()
+
+    except Exception as e:
+        print("Ошибка в transcribe_audio:", e)
+        return None
+
+    finally:
+        # Удаляем файл после распознавания
+        try:
+            if os.path.exists(filename):
+                os.remove(filename)
+        except Exception as cleanup_err:
+            print("Ошибка удаления файла:", cleanup_err)
 
 ADMIN_TEMPLATE = """
 <!DOCTYPE html>
