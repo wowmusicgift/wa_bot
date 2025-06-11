@@ -196,6 +196,14 @@ def generate_gpt_reply(user_history):
 
 def notify_admin(client_chat_id, history):
     try:
+        # Проверка: уже ли был установлен флаг started
+        already_started = any(msg.get("started") for msg in history if isinstance(msg, dict))
+        if not already_started:
+            print("⛔ notify_admin не вызван: флаг started отсутствует")
+            return
+
+        print("🚀 notify_admin активирован")
+
         summary = f"🔔 Новый заказ от клиента {client_chat_id}\n\n..."
         for h in history[-6:]:
             role = "👤" if h['role'] == "user" else "🤖"
@@ -210,7 +218,7 @@ def notify_admin(client_chat_id, history):
 
     except Exception as e:
         print("Ошибка уведомления оператора:", e)
-
+        
 
 def append_order_to_google_sheet(client_chat_id, history):
     try:
