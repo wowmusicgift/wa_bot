@@ -98,25 +98,37 @@ def process_delayed_reply(user_id):
                 notify_admin("787776521906", conversation_history[user_id])
         pending_timers.pop(user_id, None)
 
-def send_message(to_number, text):
+def send_message(to, text, platform="whatsapp"):
     try:
-        headers = {
-            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-            "Content-Type": "application/json"
-        }
-        # Принудительно изменим формат номера для отправки
-        if to_number == "77776521906":
-            to_number = "787776521906"
-        data = {
-            "messaging_product": "whatsapp",
-            "to": to_number,
-            "type": "text",
-            "text": {"body": text}
-        }
-        response = requests.post(WHATSAPP_API_URL, headers=headers, json=data)
-        print("Ответ WhatsApp:", response.status_code, response.text)
+        if platform == "whatsapp":
+            headers = {
+                "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+                "Content-Type": "application/json"
+            }
+            # Принудительно изменим формат номера для отправки
+            if to == "77776521906":
+                to = "787776521906"
+            data = {
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "text",
+                "text": {"body": text}
+            }
+            response = requests.post(WHATSAPP_API_URL, headers=headers, json=data)
+            print("Ответ WhatsApp:", response.status_code, response.text)
+
+        elif platform == "telegram":
+            TELEGRAM_API_URL = f"https://api.telegram.org/bot{os.environ.get('TELEGRAM_BOT_TOKEN')}/sendMessage"
+            data = {
+                "chat_id": to,
+                "text": text
+            }
+            response = requests.post(TELEGRAM_API_URL, json=data)
+            print("Ответ Telegram:", response.status_code, response.text)
+
     except Exception as e:
-        print("Ошибка отправки WhatsApp:", e)
+        print(f"Ошибка отправки ({platform}):", e)
+
 
 def generate_gpt_reply(user_history):
     system_prompt = {
@@ -176,13 +188,16 @@ def notify_admin(client_chat_id, history):
             role = "👤" if h['role'] == "user" else "🤖"
             summary += f"{role} {h['content']}\n"
 
-        send_message(ADMIN_CHAT_ID, summary.strip())
+        send_message(ADMIN_CHAT_ID, summary.strip(), platform="telegram")
         append_order_to_google_sheet(client_chat_id, history)
+
         song_text = generate_song_text(history)
         if song_text:
-            send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:\n\n{song_text}")
+            send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:\n\n{song_text}", platform="telegram")
+
     except Exception as e:
         print("Ошибка уведомления оператора:", e)
+
 
 def append_order_to_google_sheet(client_chat_id, history):
     try:
