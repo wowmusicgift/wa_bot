@@ -62,26 +62,36 @@ def whatsapp_webhook():
             msg = messages[0]
             wa_id = msg["from"]
             msg_type = msg.get("type")
-
-            if msg_type == "text":
-                text = msg["text"]["body"].strip()
-                handle_user_message(wa_id, text)
-            
-            elif msg_type == "audio" or (msg_type == "voice"):  # поддержка голосовых
+        
+            if msg_type in ["audio", "voice"]:
                 try:
                     media_id = msg[msg_type]["id"]
                     text = transcribe_audio(media_id, wa_id)
                     if text:
-                        handle_user_message(wa_id, text)
-                        send_message(wa_id, f"✅ Голосовое сообщение распознано:\n{text}")
+                        if wa_id not in conversation_history:
+                            conversation_history[wa_id] = [{"role": "user", "content": text}]
+                            last_message_time[wa_id] = time.time()
+                        else:
+                            conversation_history[wa_id].append({"role": "user", "content": text})
+                            conversation_history[wa_id] = conversation_history[wa_id][-50:]
+                            last_message_time[wa_id] = time.time()
+        
+                        if wa_id not in pending_timers:
+                            timer = threading.Timer(DELAY_SECONDS, process_delayed_reply, args=(wa_id,))
+                            timer.start()
+                            pending_timers[wa_id] = timer
                     else:
                         send_message(wa_id, "❌ Не удалось распознать голосовое сообщение 😔")
                 except Exception as e:
                     print("Ошибка голосового сообщения:", e)
+        
+            elif msg_type == "text":
+                try:
+                    text = msg["text"]["body"]
+                    handle_user_message(wa_id, text)
+                except Exception as e:
+                    print("Ошибка обработки текстового сообщения:", e)
 
-    except Exception as e:
-        print("Ошибка обработки сообщения:", e)
-    return "ok", 200
 
 def handle_user_message(user_id, text):
     if text.lower() == "memory_clean":
