@@ -43,8 +43,20 @@ def home():
 @app.route("/webhook", methods=["GET", "POST"])
 def whatsapp_webhook():
     if request.method == "GET":
-        if request.args.get("hub.verify_token") == WHATSAPP_VERIFY_TOKEN:
-            return request.args.get("hub.challenge"), 200
+        print("👉 Токен из запроса:", request.args.get("hub.verify_token"))
+        print("🛠️ Токен из переменной:", WHATSAPP_VERIFY_TOKEN)
+        
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+
+        print("🔐 Проверка Webhook")
+        print("👉 Токен из запроса:", token)
+        print("🛠️ Токен из переменной:", WHATSAPP_VERIFY_TOKEN)
+        print("🎯 Challenge:", challenge)
+
+        if token and challenge and token == WHATSAPP_VERIFY_TOKEN:
+            return challenge, 200
+            
         return "Ошибка верификации", 403
 
     data = request.get_json()
@@ -165,7 +177,7 @@ def generate_gpt_reply(user_history):
 
 def notify_admin(client_chat_id, history):
     try:
-        summary = f"\ud83d\udd14 Новый заказ от клиента {client_chat_id}\n\nПоследние сообщения:\n"
+        summary = f"🔔 Новый заказ от клиента {client_chat_id}\n\n..."
         for h in history[-6:]:
             role = "👤" if h['role'] == "user" else "🤖"
             summary += f"{role} {h['content']}\n"
@@ -174,7 +186,7 @@ def notify_admin(client_chat_id, history):
         append_order_to_google_sheet(client_chat_id, history)
         song_text = generate_song_text(history)
         if song_text:
-            send_message(ADMIN_CHAT_ID, f"\ud83c\udfb5 Готовый текст песни:\n\n{song_text}")
+            send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:\n\n{song_text}")
     except Exception as e:
         print("Ошибка уведомления оператора:", e)
 
