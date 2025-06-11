@@ -11,6 +11,8 @@ import pytz
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+last_voice_file = {}
+
 # Flask app
 app = Flask(__name__)
 
@@ -68,7 +70,7 @@ def whatsapp_webhook():
             elif msg_type == "audio" or (msg_type == "voice"):  # поддержка голосовых
                 try:
                     media_id = msg[msg_type]["id"]
-                    text = transcribe_audio(media_id)
+                    text = transcribe_audio(media_id, wa_id)
                     if text:
                         handle_user_message(wa_id, text)
                         send_message(wa_id, f"✅ Голосовое сообщение распознано:\n{text}")
@@ -233,6 +235,22 @@ def notify_admin(client_chat_id, history):
         if song_text:
             send_message(ADMIN_CHAT_ID, f"🎵 Готовый текст песни:\n\n{song_text}", platform="telegram")
 
+                # Отправка голосового, если был
+        voice_path = last_voice_file.get(client_chat_id)
+        if voice_path and os.path.exists(voice_path):
+            with open(voice_path, "rb") as f:
+                telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+                telegram_api_url = f"https://api.telegram.org/bot{telegram_token}/sendVoice"
+                files = {'voice': f}
+                data = {'chat_id': ADMIN_CHAT_ID}
+                r = requests.post(telegram_api_url, files=files, data=data)
+                print("🎯 Голосовое сообщение отправлено в Telegram:", r.status_code)
+
+            # После отправки — удаляем файл
+            os.remove(voice_path)
+            del last_voice_file[client_chat_id]
+
+
     except Exception as e:
         print("Ошибка уведомления оператора:", e)
         
@@ -278,25 +296,25 @@ def generate_song_text(history):
         return None
         
 
-def transcribe_audio(media_id):
+def transcribe_audio(media_id, user_id=None):
     try:
         print("🎙 Распознаём голосовое...")
 
-        # Получаем URL для скачивания медиа
         url = f"https://graph.facebook.com/v18.0/{media_id}"
         headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
         res = requests.get(url, headers=headers)
         media_url = res.json().get("url")
 
-        # Уникальное имя файла
         filename = f"voice_{media_id}.ogg"
-
-        # Скачиваем голосовое сообщение
         audio_data = requests.get(media_url, headers=headers).content
         with open(filename, "wb") as f:
             f.write(audio_data)
 
-        # Распознаём через Whisper
+        # 📌 Сохраняем путь к файлу
+        if user_id:
+            last_voice_file[user_id] = filename
+
+        # Распознаём текст
         with open(filename, "rb") as audio_file:
             transcript = openai.audio.transcriptions.create(
                 model="whisper-1",
@@ -311,13 +329,8 @@ def transcribe_audio(media_id):
         print("Ошибка в transcribe_audio:", e)
         return None
 
-    finally:
-        # Удаляем файл после распознавания
-        try:
-            if os.path.exists(filename):
-                os.remove(filename)
-        except Exception as cleanup_err:
-            print("Ошибка удаления файла:", cleanup_err)
+    # файл НЕ удаляем здесь!
+
 
 ADMIN_TEMPLATE = """
 <!DOCTYPE html>
