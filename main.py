@@ -91,9 +91,11 @@ def whatsapp_webhook():
                     handle_user_message(wa_id, text)
                 except Exception as e:
                     print("Ошибка обработки текстового сообщения:", e)
-            
-                return "ok", 200  # <--- добавили return в конце
-            
+
+    except Exception as e:
+        print("Ошибка в основном try-блоке webhook:", e)
+
+    return "ok", 200
 
 
 def handle_user_message(user_id, text):
