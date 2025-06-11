@@ -68,9 +68,9 @@ def whatsapp_webhook():
         messages = value.get("messages")
         if messages:
             msg = messages[0]
-            from_number = msg["from"]
+            wa_id = msg["from"]
             text = msg["text"]["body"].strip()
-            handle_user_message(from_number, text)
+            handle_user_message(wa_id, text)
     except Exception as e:
         print("Ошибка обработки сообщения:", e)
     return "ok", 200
@@ -116,7 +116,7 @@ def send_message(to_number, text):
         }
         data = {
             "messaging_product": "whatsapp",
-            "to": f"+{to_number}" if not to_number.startswith("+") else to_number,
+            "to": to_number,
             "type": "text",
             "text": {"body": text}
         }
