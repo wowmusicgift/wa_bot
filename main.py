@@ -116,9 +116,10 @@ def send_message(to, text, platform="whatsapp"):
                 "Authorization": f"Bearer {WHATSAPP_TOKEN}",
                 "Content-Type": "application/json"
             }
-            # Принудительно изменим формат номера для отправки
-            if to == "77776521906":
-                to = "787776521906"
+            # Универсальная замена номера с +77 на 87
+            if to.startswith("+77"):
+                to = "87" + to[3:]
+
             data = {
                 "messaging_product": "whatsapp",
                 "to": to,
@@ -139,6 +140,7 @@ def send_message(to, text, platform="whatsapp"):
 
     except Exception as e:
         print(f"Ошибка отправки ({platform}):", e)
+
 
 
 def generate_gpt_reply(user_history):
