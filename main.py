@@ -94,8 +94,19 @@ def process_delayed_reply(user_id):
             conversation_history[user_id].append({"role": "assistant", "content": reply})
             conversation_history[user_id] = conversation_history[user_id][-50:]
             send_message(user_id, reply)
-            if "мы начинаем работу" in reply.lower():
-                notify_admin("787776521906", conversation_history[user_id])
+
+            # Проверка: если GPT сказал, что начинаем работу
+            trigger_phrases = ["начинаем работу", "приступаем", "отправим отрывки", "в течение дня всё будет"]
+            triggered = any(phrase in reply.lower() for phrase in trigger_phrases)
+
+            # Проверим, что флаг ещё не установлен
+            started_flag = any(msg.get("started") for msg in conversation_history[user_id] if isinstance(msg, dict))
+
+            if triggered and not started_flag:
+                # Установим флаг и вызовем notify_admin
+                conversation_history[user_id].append({"started": True})
+                notify_admin(user_id, conversation_history[user_id])
+
         pending_timers.pop(user_id, None)
 
 def send_message(to, text, platform="whatsapp"):
