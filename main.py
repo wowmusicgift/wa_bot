@@ -228,7 +228,10 @@ def append_order_to_google_sheet(client_chat_id, history):
         creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
         sheet_client = gspread.authorize(creds)
         sheet = sheet_client.open_by_key(SHEET_ID).get_worksheet(0)
-        user_msgs = [h['content'] for h in history[-6:] if h['role'] == 'user']
+        
+        # Защита от флагов без role/content
+        user_msgs = [h['content'] for h in history[-6:] if h.get('role') == 'user' and 'content' in h]
+        
         now = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
         row = [client_chat_id, now, " / ".join(user_msgs)]
         sheet.append_row(row)
@@ -236,13 +239,17 @@ def append_order_to_google_sheet(client_chat_id, history):
     except Exception as e:
         print("Ошибка записи в таблицу:", e)
 
+
 def generate_song_text(history):
     try:
         prompt = {
             "role": "system",
             "content": """Вы — профессиональный автор песен. На основе истории клиента напишите текст песни с обозначениями частей: [Verse 1], [Chorus], [Verse 2], [Bridge], [Final]."""
         }
-        messages = [h for h in history if h["role"] == "user"]
+        
+        # Только сообщения от пользователя
+        messages = [h for h in history if h.get("role") == "user"]
+
         result = openai.chat.completions.create(
             model="gpt-4o",
             messages=[prompt] + messages,
@@ -253,6 +260,7 @@ def generate_song_text(history):
     except Exception as e:
         print("Ошибка генерации песни:", e)
         return None
+
 
 ADMIN_TEMPLATE = """
 <!DOCTYPE html>
